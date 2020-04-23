@@ -397,7 +397,7 @@ static struct fuse_operations xmp_oper = {
 	.read		= xmp_read,
 	.write		= xmp_write,
 	.statfs		= xmp_statfs,
-	.create         = xmp_create,
+	.create     = xmp_create,
 	.release	= xmp_release,
 	.fsync		= xmp_fsync,
 #ifdef HAVE_SETXATTR
