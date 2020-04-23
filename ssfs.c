@@ -52,7 +52,7 @@
 static const char *dirpath = "/home/ikta/Documents";
 static const char *logpath = "/home/ikta/fs.log";
 
-char getEncryptedChar(char in){
+char getEncrypted1Char(char in){
 	char keystring[] = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
 	int key = 10;
 	for(int i = 0;i<strlen(keystring);i++){
@@ -63,14 +63,53 @@ char getEncryptedChar(char in){
     return in;
 }
 
-void getEncryptedString(char * string, char * encString){
-	char buffer[PATH_MAX];
-	// strcpy(buffer,string);
-	for(int i=0;i<strlen(string);i++){
-		buffer[i] = getEncryptedChar(string[i]);
+char getDecrypted1Char(char in){
+	char keystring[] = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
+	int key = strlen(keystring) - 10;
+	for(int i = 0;i<strlen(keystring);i++){
+		if(in == keystring[i]){
+			return keystring[(i+key)%strlen(keystring)];
+		}
 	}
-	memset(encString,0,strlen(encString));
-    strcpy(encString,buffer);
+    return in;
+}
+
+void encrypt1string(char * in){
+	for(int i=0;i<strlen(in);i++){
+		if(in[i] == '.') break;
+		in[i] = getEncrypted1Char(in[i]);
+	}
+}
+
+void decrypt1string(char * in){
+	for(int i=0;i<strlen(in);i++){
+		if(in[i] == '.') break;
+		in[i] = getDecrypted1Char(in[i]);
+	}
+}
+
+void getEncrypted1String(char * string, char * encString){
+	if(strcmp(string,".") == 0 || strcmp(string,"..") == 0) return;
+	strcpy(encString,string);
+	// int length = strlen(encString);
+	char * encv1 = strstr(encString,"encv1_");
+	// printf("%s\n",encv1);
+	char * slash = strstr(encv1,"/");
+	if(slash != NULL) {
+		encrypt1string(slash);
+	}
+}
+
+void getDecrypted1String(char * string, char * decString){
+	if(strcmp(string,".") == 0 || strcmp(string,"..") == 0) return;
+	strcpy(decString,string);
+	// int length = strlen(decString);
+	char * encv1 = strstr(decString,"encv1_");
+	// printf("%s\n",encv1);
+	char * slash = strstr(encv1,"/");
+	if(slash != NULL) {
+		decrypt1string(slash);
+	}
 }
 
 void getTime(char * dest){
@@ -197,6 +236,18 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		memset(&st, 0, sizeof(st));
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
+
+		char temp[PATH_MAX];
+		char temp2[PATH_MAX];
+		char * encv1 = strstr(fpath,"encv1_");
+		if(encv1 != NULL){
+			printf("masuk sini\n");
+			getEncrypted1String(fpath,temp);
+			printf("%s\n",temp);
+			getDecrypted1String(temp,temp2);
+			printf("%s\n",temp2);
+		}
+
 		if (filler(buf, de->d_name, &st, 0))
 			break;
 	}
