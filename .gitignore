@@ -1,3 +1,6 @@
 folder/
 testrun.sh
 ssfs
+encryptiontest*
+.vscode/
+

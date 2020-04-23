@@ -46,8 +46,65 @@
 #include <sys/xattr.h>
 #endif
 #include <limits.h>
+#include <time.h>
+#include <stdlib.h>
 
 static const char *dirpath = "/home/ikta/Documents";
+static const char *logpath = "/fs.log";
+
+char getEncryptedChar(char in){
+	char keystring[] = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
+	int key = 10;
+	for(int i = 0;i<strlen(keystring);i++){
+		if(in == keystring[i]){
+			return keystring[(i+key)%strlen(keystring)];
+		}
+	}
+    return in;
+}
+
+void getEncryptedString(char * string, char * encString){
+	char buffer[PATH_MAX];
+	// strcpy(buffer,string);
+	for(int i=0;i<strlen(string);i++){
+		buffer[i] = getEncryptedChar(string[i]);
+	}
+	memset(encString,0,strlen(encString));
+    strcpy(encString,buffer);
+}
+
+void getTime(char * dest){
+    char buffer[10000];
+    memset(buffer,0,sizeof(buffer));
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    strftime(buffer,sizeof(buffer),"%y%m%d-%X",&tm);
+    strcpy(dest,buffer);
+}
+
+void printlog(char * args){
+	char logfile[PATH_MAX];
+	sprintf(logfile,"%s%s",dirpath,logpath);
+	printf("%s",logfile);
+	FILE* log;
+	log = fopen(logfile,"a+");
+	fprintf(log,"%s\n",args);
+	fclose(log);
+}
+
+void printInfo(char * args){
+	char message[10000],timestamp[40];
+	getTime(timestamp);
+	sprintf(message,"%s::%s::%s","INFO",timestamp,args);
+	printlog(message);
+}
+
+void printWarning(char * args){
+	char message[10000],timestamp[40];
+	getTime(timestamp);
+	sprintf(message,"%s::%s::%s","WARNING",timestamp,args);
+	printlog(message);
+}
 
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
@@ -59,6 +116,9 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","GETATTR",path);
+	printInfo(logbuffer);
 
 	res = lstat(fpath, stbuf);
 	if (res == -1)
@@ -77,6 +137,9 @@ static int xmp_access(const char *path, int mask)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","ACCESS",path);
+	printInfo(logbuffer);
 
 	res = access(fpath, mask);
 	if (res == -1)
@@ -95,6 +158,9 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","READLINK",path);
+	printInfo(logbuffer);
 
 	res = readlink(fpath, buf, size - 1);
 	if (res == -1)
@@ -121,6 +187,9 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","READDIR",path);
+	printInfo(logbuffer);
 
 	dp = opendir(fpath);
 	if (dp == NULL)
@@ -149,6 +218,9 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","MKNOD",path);
+	printInfo(logbuffer);
 
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
@@ -176,6 +248,9 @@ static int xmp_mkdir(const char *path, mode_t mode)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","MKDIR",path);
+	printInfo(logbuffer);
 
 	res = mkdir(fpath, mode);
 	if (res == -1)
@@ -194,6 +269,9 @@ static int xmp_unlink(const char *path)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","UNLINK",path);
+	printWarning(logbuffer);
 
 
 	res = unlink(fpath);
@@ -213,6 +291,9 @@ static int xmp_rmdir(const char *path)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","RMDIR",path);
+	printWarning(logbuffer);
 
 
 	res = rmdir(fpath);
@@ -226,6 +307,10 @@ static int xmp_symlink(const char *from, const char *to)
 {
 	int res;
 
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s::%s","SYMLINK",from,to);
+	printInfo(logbuffer);
+
 	res = symlink(from, to);
 	if (res == -1)
 		return -errno;
@@ -237,6 +322,10 @@ static int xmp_rename(const char *from, const char *to)
 {
 	int res;
 
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s::%s","RENAME",from,to);
+	printInfo(logbuffer);
+
 	res = rename(from, to);
 	if (res == -1)
 		return -errno;
@@ -247,6 +336,10 @@ static int xmp_rename(const char *from, const char *to)
 static int xmp_link(const char *from, const char *to)
 {
 	int res;
+
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s::%s","LINK",from,to);
+	printInfo(logbuffer);
 
 	res = link(from, to);
 	if (res == -1)
@@ -265,6 +358,9 @@ static int xmp_chmod(const char *path, mode_t mode)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","CHMOD",path);
+	printInfo(logbuffer);
 
 
 	res = chmod(fpath, mode);
@@ -284,6 +380,9 @@ static int xmp_chown(const char *path, uid_t uid, gid_t gid)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","CHOWN",path);
+	printInfo(logbuffer);
 
 
 	res = lchown(fpath, uid, gid);
@@ -303,6 +402,9 @@ static int xmp_truncate(const char *path, off_t size)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","TRUNCATE",path);
+	printInfo(logbuffer);
 
 
 	res = truncate(fpath, size);
@@ -322,6 +424,9 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","UTIMENS",path);
+	printInfo(logbuffer);
 
 	struct timeval tv[2];
 
@@ -347,6 +452,9 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","OPEN",path);
+	printInfo(logbuffer);
 
 
 	res = open(fpath, fi->flags);
@@ -369,6 +477,9 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","READ",path);
+	printInfo(logbuffer);
 
 
 	(void) fi;
@@ -396,6 +507,9 @@ static int xmp_write(const char *path, const char *buf, size_t size,
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","WRITE",path);
+	printInfo(logbuffer);
 
 
 	(void) fi;
@@ -421,6 +535,9 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","STATFS",path);
+	printInfo(logbuffer);
 
 
 	res = statvfs(fpath, stbuf);
@@ -440,6 +557,9 @@ static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) 
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","CREATE",path);
+	printInfo(logbuffer);
 
 
     int res;
@@ -486,6 +606,9 @@ static int xmp_setxattr(const char *path, const char *name, const char *value,
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","SETXATTR",path);
+	printInfo(logbuffer);
 
 	int res = lsetxattr(fpath, name, value, size, flags);
 	if (res == -1)
@@ -503,6 +626,9 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","GETXATTR",path);
+	printInfo(logbuffer);
 
 	int res = lgetxattr(fpath, name, value, size);
 	if (res == -1)
@@ -519,6 +645,9 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","LISTXATTR",path);
+	printInfo(logbuffer);
 
 	int res = llistxattr(fpath, list, size);
 	if (res == -1)
@@ -535,6 +664,9 @@ static int xmp_removexattr(const char *path, const char *name)
     }else{
         sprintf(fpath, "%s%s",dirpath,path);
     }
+	char logbuffer[1000];
+	sprintf(logbuffer,"%s::%s","REMOVEXATTR",path);
+	printInfo(logbuffer);
 
 	int res = lremovexattr(fpath, name);
 	if (res == -1)
