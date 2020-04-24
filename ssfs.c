@@ -51,6 +51,14 @@
 
 static const char *dirpath = "/home/ikta/Documents";
 static const char *logpath = "/home/ikta/fs.log";
+static char lastCommand[1000];
+
+int is_regular_file( char *path)
+{
+    struct stat path_stat;
+    stat(path, &path_stat);
+    return S_ISREG(path_stat.st_mode);
+}
 
 char getEncrypted1Char(char in){
 	char keystring[] = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
@@ -74,41 +82,46 @@ char getDecrypted1Char(char in){
     return in;
 }
 
-void encrypt1string(char * in){
-	for(int i=0;i<strlen(in);i++){
-		if(in[i] == '.') break;
+void encrypt1string(char * in,int stop){
+	if(strcmp(in,".") == 0 || strcmp(in,"..") == 0) return;
+	for(int i=0;i<stop;i++){
 		in[i] = getEncrypted1Char(in[i]);
 	}
 }
 
-void decrypt1string(char * in){
-	for(int i=0;i<strlen(in);i++){
-		if(in[i] == '.') break;
+void decrypt1string(char * in,int stop){
+	if(strcmp(in,".") == 0 || strcmp(in,"..") == 0) return;
+	for(int i=0;i<stop-1;i++){
 		in[i] = getDecrypted1Char(in[i]);
 	}
 }
 
-void getEncrypted1String(char * string, char * encString){
+void getEncrypted1String(char * string){
 	if(strcmp(string,".") == 0 || strcmp(string,"..") == 0) return;
-	strcpy(encString,string);
-	// int length = strlen(encString);
-	char * encv1 = strstr(encString,"encv1_");
-	// printf("%s\n",encv1);
-	char * slash = strstr(encv1,"/");
-	if(slash != NULL) {
-		encrypt1string(slash);
+	int stop = strlen(string);
+	for(int i=stop;i>=0;i--){
+		if(string[i] == '/') break;
+		if(string[i] == '.'){
+			stop = i;
+			break;
+		}
 	}
+	encrypt1string(string,stop);
 }
 
-void getDecrypted1String(char * string, char * decString){
+void getDecrypted1String(char * string){
 	if(strcmp(string,".") == 0 || strcmp(string,"..") == 0) return;
-	strcpy(decString,string);
-	// int length = strlen(decString);
-	char * encv1 = strstr(decString,"encv1_");
-	// printf("%s\n",encv1);
-	char * slash = strstr(encv1,"/");
+	char * slash = strstr(string,"/");
 	if(slash != NULL) {
-		decrypt1string(slash);
+		int stop = strlen(slash);
+		for(int i=stop;i>=0;i--){
+			if(slash[i] == '/') break;
+			if(slash[i] == '.'){
+				stop = i;
+				break;
+			}
+		}
+		decrypt1string(slash+1,stop);
 	}
 }
 
@@ -145,6 +158,12 @@ void printWarning(char * args){
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -166,6 +185,11 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 static int xmp_access(const char *path, int mask)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -176,6 +200,7 @@ static int xmp_access(const char *path, int mask)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","ACCESS",path);
 	printInfo(logbuffer);
+	strcpy(lastCommand,"access");
 
 	res = access(fpath, mask);
 	if (res == -1)
@@ -187,6 +212,11 @@ static int xmp_access(const char *path, int mask)
 static int xmp_readlink(const char *path, char *buf, size_t size)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -197,6 +227,7 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","READLINK",path);
 	printInfo(logbuffer);
+	strcpy(lastCommand,"readlink");
 
 	res = readlink(fpath, buf, size - 1);
 	if (res == -1)
@@ -216,6 +247,14 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) offset;
 	(void) fi;
 
+	// printf("debug init readdir path : %s\n",path);
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}	// printf("debug enc readdir path : %s\n",path);
+
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -226,6 +265,8 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","READDIR",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"readdir");
 
 	dp = opendir(fpath);
 	if (dp == NULL)
@@ -237,16 +278,11 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
 
-		char temp[PATH_MAX];
-		char temp2[PATH_MAX];
-		char * encv1 = strstr(fpath,"encv1_");
+		// printf("debug dename init : %s\n",de->d_name);
 		if(encv1 != NULL){
-			printf("masuk sini\n");
-			getEncrypted1String(fpath,temp);
-			printf("%s\n",temp);
-			getDecrypted1String(temp,temp2);
-			printf("%s\n",temp2);
+			getEncrypted1String(de->d_name);
 		}
+		// printf("debug dename enc : %s\n",de->d_name);
 
 		if (filler(buf, de->d_name, &st, 0))
 			break;
@@ -259,6 +295,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	int res;
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -269,6 +306,8 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","MKNOD",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"mknod");
 
 	/* On Linux this could just be 'mknod(path, mode, rdev)' but this
 	   is more portable */
@@ -289,6 +328,7 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 static int xmp_mkdir(const char *path, mode_t mode)
 {
 	int res;
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -299,6 +339,8 @@ static int xmp_mkdir(const char *path, mode_t mode)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","MKDIR",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"mkdir");
 
 	res = mkdir(fpath, mode);
 	if (res == -1)
@@ -310,6 +352,11 @@ static int xmp_mkdir(const char *path, mode_t mode)
 static int xmp_unlink(const char *path)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -320,6 +367,8 @@ static int xmp_unlink(const char *path)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","UNLINK",path);
 	printWarning(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"unlink");
 
 
 	res = unlink(fpath);
@@ -332,6 +381,11 @@ static int xmp_unlink(const char *path)
 static int xmp_rmdir(const char *path)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -342,6 +396,8 @@ static int xmp_rmdir(const char *path)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","RMDIR",path);
 	printWarning(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"rmdir");
 
 
 	res = rmdir(fpath);
@@ -358,6 +414,8 @@ static int xmp_symlink(const char *from, const char *to)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s::%s","SYMLINK",from,to);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"symlink");
 
 	res = symlink(from, to);
 	if (res == -1)
@@ -373,6 +431,8 @@ static int xmp_rename(const char *from, const char *to)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s::%s","RENAME",from,to);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"rename");
 
 	res = rename(from, to);
 	if (res == -1)
@@ -388,6 +448,8 @@ static int xmp_link(const char *from, const char *to)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s::%s","LINK",from,to);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"link");
 
 	res = link(from, to);
 	if (res == -1)
@@ -399,6 +461,11 @@ static int xmp_link(const char *from, const char *to)
 static int xmp_chmod(const char *path, mode_t mode)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -409,6 +476,8 @@ static int xmp_chmod(const char *path, mode_t mode)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","CHMOD",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"chmod");
 
 
 	res = chmod(fpath, mode);
@@ -421,6 +490,11 @@ static int xmp_chmod(const char *path, mode_t mode)
 static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -431,6 +505,8 @@ static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","CHOWN",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"chown");
 
 
 	res = lchown(fpath, uid, gid);
@@ -443,6 +519,11 @@ static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 static int xmp_truncate(const char *path, off_t size)
 {
 	int res;
+	// char * encv1 = strstr(path,"encv1_");
+	// if(encv1 != NULL){
+	// 	getDecrypted1String(encv1);
+	// }
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -453,6 +534,8 @@ static int xmp_truncate(const char *path, off_t size)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","TRUNCATE",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"truncate");
 
 
 	res = truncate(fpath, size);
@@ -465,6 +548,11 @@ static int xmp_truncate(const char *path, off_t size)
 static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
 	int res;
+	// char * encv1 = strstr(path,"encv1_");
+	// if(encv1 != NULL){
+	// 	getDecrypted1String(encv1);
+	// }
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -475,6 +563,8 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","UTIMENS",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"utimens");
 
 	struct timeval tv[2];
 
@@ -493,6 +583,11 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -503,6 +598,8 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","OPEN",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"open");
 
 
 	res = open(fpath, fi->flags);
@@ -518,6 +615,11 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	int fd;
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -528,6 +630,8 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","READ",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"read");
 
 
 	(void) fi;
@@ -548,6 +652,11 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 {
 	int fd;
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -558,6 +667,8 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","WRITE",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"write");
 
 
 	(void) fi;
@@ -576,6 +687,11 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
 {
 	int res;
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -586,6 +702,8 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","STATFS",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"statfs");
 
 
 	res = statvfs(fpath, stbuf);
@@ -598,6 +716,11 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
 
     (void) fi;
+	// char * encv1 = strstr(path,"encv1_");
+	// if(encv1 != NULL){
+	// 	getDecrypted1String(encv1);
+	// }
+
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -608,6 +731,8 @@ static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) 
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","CREATE",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"create");
 
 
     int res;
@@ -647,6 +772,11 @@ static int xmp_fsync(const char *path, int isdatasync,
 static int xmp_setxattr(const char *path, const char *name, const char *value,
 			size_t size, int flags)
 {
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -657,6 +787,8 @@ static int xmp_setxattr(const char *path, const char *name, const char *value,
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","SETXATTR",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"SETXATTR");
 
 	int res = lsetxattr(fpath, name, value, size, flags);
 	if (res == -1)
@@ -667,6 +799,11 @@ static int xmp_setxattr(const char *path, const char *name, const char *value,
 static int xmp_getxattr(const char *path, const char *name, char *value,
 			size_t size)
 {
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -677,6 +814,8 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","GETXATTR",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"GETXATTR");
 
 	int res = lgetxattr(fpath, name, value, size);
 	if (res == -1)
@@ -686,6 +825,11 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
 
 static int xmp_listxattr(const char *path, char *list, size_t size)
 {
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -696,6 +840,8 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","LISTXATTR",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"LISTXATTR");
 
 	int res = llistxattr(fpath, list, size);
 	if (res == -1)
@@ -705,6 +851,11 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 
 static int xmp_removexattr(const char *path, const char *name)
 {
+	char * encv1 = strstr(path,"encv1_");
+	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
         path=dirpath;
@@ -715,6 +866,8 @@ static int xmp_removexattr(const char *path, const char *name)
 	char logbuffer[1000];
 	sprintf(logbuffer,"%s::%s","REMOVEXATTR",path);
 	printInfo(logbuffer);
+	memset(lastCommand,0,sizeof(lastCommand));
+	strcpy(lastCommand,"REMOVEXATTR");
 
 	int res = lremovexattr(fpath, name);
 	if (res == -1)
