@@ -125,6 +125,89 @@ void getDecrypted1String(char * string){
 	}
 }
 
+void encry2(char * filePath){
+	FILE * file = fopen(filePath,"rb");
+	char toPath[PATH_MAX];
+	int i=0;
+	sprintf(toPath,"%s.%03d",filePath,i);
+	void * buffer = malloc(1024);
+	while(1){
+		size_t readSize = fread(buffer,1,1024,file);
+		if(readSize == 0)break;
+		FILE * new = fopen(toPath,"w");
+		fwrite(buffer,1,readSize,new);
+		fclose(new);
+		i++;
+		sprintf(toPath,"%s.%03d",filePath,i);
+	}
+	free(buffer);
+	fclose(file);
+	remove(filePath);
+}
+
+
+void decry2(char * filePath){
+	FILE * check = fopen(filePath,"r");
+	if(check != NULL)return;
+	FILE * new = fopen(filePath,"w");
+	int i = 0;
+	char toPath[PATH_MAX];
+	sprintf(toPath,"%s.%03d",filePath,i);
+	void * buffer = malloc(1024);
+	while(1){
+		FILE * temp = fopen(toPath,"rb");
+		if(temp == NULL) break;
+		size_t readSize = fread(buffer,1,1024,temp);
+		fwrite(buffer,1,readSize,new);
+		fclose(temp);
+		remove(toPath);
+		i++;
+		sprintf(toPath,"%s.%03d",filePath,i);
+	}
+	free(buffer);
+	fclose(new);
+}
+
+void encry2all(char * dirPath){
+	DIR * p;
+	struct dirent *c;
+	p = opendir(dirPath);
+	if(p==NULL) return;
+	char dir[PATH_MAX];
+	char filePath[PATH_MAX];
+	while((c = readdir(p)) != NULL){
+		if(strcmp(c->d_name,".") == 0 || strcmp(c->d_name,"..") == 0) continue;
+		if(!is_regular_file(c->d_name)){
+			sprintf(dir,"%s/%s",dirPath,c->d_name);
+			encry2all(dir);
+		}else{
+			sprintf(filePath,"%s/%s",dirPath,c->d_name);
+			encry2(filePath);
+		}
+	}
+	closedir(p);
+}
+
+void decry2all(char * dirPath){
+	DIR * p;
+	struct dirent *c;
+	p = opendir(dirPath);
+	if(p == NULL )return;
+	char dir[PATH_MAX];
+	char filePath[PATH_MAX];
+	while((c = readdir(p)) != NULL){
+		if(strcmp(c->d_name,".") == 0 || strcmp(c->d_name,"..") == 0) continue;
+		if(!is_regular_file(c->d_name)){
+			sprintf(dir,"%s/%s",dirPath,c->d_name);
+			decry2all(dir);
+		}else{
+			sprintf(filePath,"%s/%s",dirPath,c->d_name);
+			decry2(filePath);
+		}
+	}
+	closedir(p);
+}
+
 void getTime(char * dest){
     char buffer[10000];
     memset(buffer,0,sizeof(buffer));
@@ -159,6 +242,7 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 {
 	int res;
 	char * encv1 = strstr(path,"encv1_");
+	char * encv2 = strstr(path,"encv2_");
 	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
 		getDecrypted1String(encv1);
 		printf("debug dec getattr path : %s\n",path);
@@ -175,9 +259,28 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 	sprintf(logbuffer,"%s::%s","GETATTR",path);
 	printInfo(logbuffer);
 
-	res = lstat(fpath, stbuf);
-	if (res == -1)
-		return -errno;
+	if(encv2 == NULL){
+		res = lstat(fpath,stbuf);
+		if(res == -1){
+			return -errno;
+		}
+	}else{
+		sprintf(fpath,"%s%s.000",dirpath,path);
+		lstat(fpath,stbuf);
+		struct stat st;
+		int i=0;
+		int sizeCount = 0;
+		while(1){
+			res = stat(fpath,&st);
+			if(res < 0){
+				break;
+			}
+			i++;
+			sprintf(fpath,"%s%s.%03d",dirpath,path,i);
+			sizeCount += st.st_size;
+		}
+		stbuf->st_size = sizeCount;
+	}
 
 	return 0;
 }
@@ -241,6 +344,7 @@ static int xmp_readlink(const char *path, char *buf, size_t size)
 static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi)
 {
+	int res;
 	DIR *dp;
 	struct dirent *de;
 
@@ -249,6 +353,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	// printf("debug init readdir path : %s\n",path);
 	char * encv1 = strstr(path,"encv1_");
+	char * encv2 = strstr(path,"encv2_");
 	if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
 		getDecrypted1String(encv1);
 		printf("debug dec getattr path : %s\n",path);
@@ -279,12 +384,21 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		st.st_mode = de->d_type << 12;
 
 		// printf("debug dename init : %s\n",de->d_name);
-		if(encv1 != NULL){
-			getEncrypted1String(de->d_name);
+		if(encv2 != NULL){
+			if(!is_regular_file(de->d_name)){
+				if(strcmp(de->d_name+(strlen(de->d_name)-4),".000") == 0){
+					*(de->d_name + +(strlen(de->d_name)-4)) = '\0';
+					res = (filler(buf,de->d_name,&st,0));
+				}
+			}
+		}else{ 
+			if(encv1 != NULL){
+				getEncrypted1String(de->d_name);
+			}
+			res = (filler(buf,de->d_name,&st,0));
 		}
-		// printf("debug dename enc : %s\n",de->d_name);
 
-		if (filler(buf, de->d_name, &st, 0))
+		if (res)
 			break;
 	}
 
