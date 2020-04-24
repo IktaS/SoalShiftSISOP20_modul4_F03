@@ -873,5 +873,5 @@ static int xmp_removexattr(const char *path, const char *name)
 }
 ```
 
-#Permasalahan yang dihadapi
+# Permasalahan yang dihadapi
 -Kurangnya dokumentasi mengenai Fuse serta kesulitan pencarian penjelasan Fuse yang jelas dan lengkap
