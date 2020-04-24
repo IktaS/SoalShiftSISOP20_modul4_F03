@@ -412,20 +412,20 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
 	int res;
-	char * encv1 = strstr(path,"encv1_");
-	if(encv1 != NULL){
-		char * slash = strchr(encv1,'/');
-		if(slash != NULL){
-			int len = strlen(slash);
-			for(int i=len;i>=0;i++){
-				if(slash[i] == '/'){
-					len = i;
-					break;
-				}
-			}
-			decrypt1string(slash,len);
-		}
-	}
+	// char * encv1 = strstr(path,"encv1_");
+	// if(encv1 != NULL){
+	// 	char * slash = strchr(encv1,'/');
+	// 	if(slash != NULL){
+	// 		int len = strlen(slash);
+	// 		for(int i=len;i>=0;i++){
+	// 			if(slash[i] == '/'){
+	// 				len = i;
+	// 				break;
+	// 			}
+	// 		}
+	// 		decrypt1string(slash,len);
+	// 	}
+	// }
 
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
@@ -459,20 +459,20 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 static int xmp_mkdir(const char *path, mode_t mode)
 {
 	int res;
-	char * encv1 = strstr(path,"encv1_");
-	if(encv1 != NULL){
-		char * slash = strchr(encv1,'/');
-		if(slash != NULL){
-			int len = strlen(slash);
-			for(int i=len;i>=0;i++){
-				if(slash[i] == '/'){
-					len = i;
-					break;
-				}
-			}
-			decrypt1string(slash,len);
-		}
-	}
+	// char * encv1 = strstr(path,"encv1_");
+	// if(encv1 != NULL){
+	// 	char * slash = strchr(encv1,'/');
+	// 	if(slash != NULL){
+	// 		int len = strlen(slash);
+	// 		for(int i=len;i>=0;i++){
+	// 			if(slash[i] == '/'){
+	// 				len = i;
+	// 				break;
+	// 			}
+	// 		}
+	// 		decrypt1string(slash,len);
+	// 	}
+	// }
 
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
@@ -861,20 +861,20 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
 
     (void) fi;
-	char * encv1 = strstr(path,"encv1_");
-	if(encv1 != NULL){
-		char * slash = strchr(encv1,'/');
-		if(slash != NULL){
-			int len = strlen(slash);
-			for(int i=len;i>=0;i++){
-				if(slash[i] == '/'){
-					len = i;
-					break;
-				}
-			}
-			decrypt1string(slash,len);
-		}
-	}
+	// char * encv1 = strstr(path,"encv1_");
+	// if(encv1 != NULL){
+	// 	char * slash = strchr(encv1,'/');
+	// 	if(slash != NULL){
+	// 		int len = strlen(slash);
+	// 		for(int i=len;i>=0;i++){
+	// 			if(slash[i] == '/'){
+	// 				len = i;
+	// 				break;
+	// 			}
+	// 		}
+	// 		decrypt1string(slash,len);
+	// 	}
+	// }
 
 	char fpath[PATH_MAX];
 	if(strcmp(path,"/") == 0){
