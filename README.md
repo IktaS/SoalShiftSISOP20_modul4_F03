@@ -70,7 +70,7 @@ File `ssfs` ini kemudian dijalankan dengan
 ./ssfs [file atau direktori tujuan]
 ```
 ,dengan file tersebut terletak di lokasi yang sama dengan `ssfs`. Apabila berhasil, file tersebut kini akan tersambung ke direktori Documents.\
-Pada ` struct fuse_operations xmp_oper`, terdapat banyak fungsi yang ditunjuk. Berikut adalah fungsi-fungsi yang ada pada `struct` tersebut:
+Pada ` struct fuse_operations xmp_oper`, terdapat banyak fungsi yang ditunjuk. Berikut adalah fungsi-fungsi yang ada pada `struct` tersebut:\
 Xmp_getattr
 ```
 static int xmp_getattr(const char *path, struct stat *stbuf)
@@ -120,6 +120,56 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 	return 0;
 }
 ```
+Di bagian awal, terdapat `char * encv1 = strstr(path,"encv1_");`. Bagian ini berfungsi untuk mencari apakah path mempunyai "encv1_" di dalamnya. Apabila path tidak memiliki nama tersebut, maka null akan direturn. Apabila nilai yang direturn tidak null, bagian:
+```
+if(encv1 != NULL && strcmp(lastCommand,"readdir") == 0){
+		getDecrypted1String(encv1);
+		printf("debug dec getattr path : %s\n",path);
+	}
+```
+akan menjalankan fungsi:
+```
+void getDecrypted1String(char * string){
+	if(strcmp(string,".") == 0 || strcmp(string,"..") == 0) return;
+	char * slash = strstr(string,"/");
+	if(slash != NULL) {
+		int stop = strlen(slash);
+		for(int i=stop;i>=0;i--){
+			if(slash[i] == '/') break;
+			if(slash[i] == '.'){
+				stop = i;
+				break;
+			}
+		}
+		decrypt1string(slash+1,stop);
+	}
+}
+```
+yang mungkin memanggil:
+```
+void decrypt1string(char * in,int stop){
+	if(strcmp(in,".") == 0 || strcmp(in,"..") == 0) return;
+	for(int i=0;i<stop-1;i++){
+		in[i] = getDecrypted1Char(in[i]);
+	}
+}
+```
+yang kemudian memanggil:
+```
+char getDecrypted1Char(char in){
+	char keystring[] = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
+	int key = strlen(keystring) - 10;
+	for(int i = 0;i<strlen(keystring);i++){
+		if(in == keystring[i]){
+			return keystring[(i+key)%strlen(keystring)];
+		}
+	}
+    return in;
+}
+```
+yang berfungsi melakukan dekripsi caesar cipher seperti yang diminta pada soal nomor 1.\
+Bagian-bagian di atas akan dijumpai pula pada fungsi-fungsi lainnya.\
+Xmp_getattr berfungsi mendapatkan atribut file.\
 Xmp_access
 ```
 static int xmp_access(const char *path, int mask)
@@ -246,6 +296,51 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 ```
+Pada bagian ini, terdapat:
+```
+if(encv1 != NULL){
+	getEncrypted1String(de->d_name);
+}
+```
+yang berarti apabila lokasi mempunyai "encv1_", fungsi `getEncrypted1String(de->d_name)` akan dipanggil:
+```
+void getEncrypted1String(char * string){
+	if(strcmp(string,".") == 0 || strcmp(string,"..") == 0) return;
+	int stop = strlen(string);
+	for(int i=stop;i>=0;i--){
+		if(string[i] == '/') break;
+		if(string[i] == '.'){
+			stop = i;
+			break;
+		}
+	}
+	encrypt1string(string,stop);
+}
+```
+yang mungkin akan memanggil fungsi:
+```
+void encrypt1string(char * in,int stop){
+	if(strcmp(in,".") == 0 || strcmp(in,"..") == 0) return;
+	for(int i=0;i<stop;i++){
+		in[i] = getEncrypted1Char(in[i]);
+	}
+}
+```
+yang akan memanggil:
+```
+char getEncrypted1Char(char in){
+	char keystring[] = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
+	int key = 10;
+	for(int i = 0;i<strlen(keystring);i++){
+		if(in == keystring[i]){
+			return keystring[(i+key)%strlen(keystring)];
+		}
+	}
+    return in;
+}
+```
+untuk melakukan enkripsi caesar cipher seperti yang diminta pada soal nomor 1.\
+Xmp_readdir berfungsi untuk membaca direktori.\
 Xmp_mknod
 ```
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
@@ -872,6 +967,48 @@ static int xmp_removexattr(const char *path, const char *name)
 	return 0;
 }
 ```
+ \
+Apabila diperhatikan, banyak fungsi di atas yang memanggil fungsi:
+```
+void printInfo(char * args){
+	char message[10000],timestamp[40];
+	getTime(timestamp);
+	sprintf(message,"%s::%s::%s","INFO",timestamp,args);
+	printlog(message);
+}
+```
+atau
+```
+void printWarning(char * args){
+	char message[10000],timestamp[40];
+	getTime(timestamp);
+	sprintf(message,"%s::%s::%s","WARNING",timestamp,args);
+	printlog(message);
+}
+```
+Ke-2 fungsi `printInfo` dan `printWarning` memiliki tujuan yang serupa, yaitu untuk mencetak aktivitas dalam log sesuai dengan soal nomor 4. Ke-2 fungsi tersebut akan memanggil:
+```
+void printlog(char * args){
+	FILE* log;
+	log = fopen(logpath,"a+");
+	fprintf(log,"%s\n",args);
+	fclose(log);
+}
+```
+untuk mencatat aktivitas pada file `fs.log` dengan bantuan fungsi:
+```
+void getTime(char * dest){
+    char buffer[10000];
+    memset(buffer,0,sizeof(buffer));
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    strftime(buffer,sizeof(buffer),"%y%m%d-%X",&tm);
+    strcpy(dest,buffer);
+}
+```
+Untuk mendapatkan waktu saat fungsi dijalankan.\
+Sesuai perintah soal, `printWarning` dipanggil pada fungsi syscall rmdir(xmp_rmdir) dan unlink(xmp_unlink), dan `printInfo` pada fungsi lainnya.
+
 
 # Permasalahan yang dihadapi
 -Kurangnya dokumentasi mengenai Fuse serta kesulitan pencarian penjelasan Fuse yang jelas dan lengkap
