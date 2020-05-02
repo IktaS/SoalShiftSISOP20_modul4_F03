@@ -1009,6 +1009,15 @@ void getTime(char * dest){
 Untuk mendapatkan waktu saat fungsi dijalankan.\
 Sesuai perintah soal, `printWarning` dipanggil pada fungsi syscall rmdir(xmp_rmdir) dan unlink(xmp_unlink), dan `printInfo` pada fungsi lainnya.
 
+# Screenshoot
+Tersambung dengan Documents:
+![w](https://github.com/IktaS/SoalShiftSISOP20_modul4_F03/blob/master/sisop4/SamadgnDocumen.png)
+Dapat melakukan enkripsi:
+![e](https://github.com/IktaS/SoalShiftSISOP20_modul4_F03/blob/master/sisop4/Enkripsi.png)
+Dapat menangani rename:
+![k](https://github.com/IktaS/SoalShiftSISOP20_modul4_F03/blob/master/sisop4/bisahandlerename.png)
+Isi log:
+![l](https://github.com/IktaS/SoalShiftSISOP20_modul4_F03/blob/master/sisop4/isilog.png)
 
 # Permasalahan yang dihadapi
 -Kurangnya dokumentasi mengenai Fuse serta kesulitan pencarian penjelasan Fuse yang jelas dan lengkap
